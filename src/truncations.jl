@@ -47,51 +47,74 @@ function compute_doublons(res::TT, filters::Vector{TT}) where {TT<:Integer}
     return ndoublons
 end
 
-function checktruncationonall!(
-    msum::MajoranaSum{TT,CT}; max_weight::Real=Inf, min_abs_coeff=1e-10, max_unpaired::Real=Inf,
+function PropagationBase.truncate!(
+    prop_cache::AbstractMajoranaPropagationCache;
+    max_weight::Real=Inf, min_abs_coeff=1e-10, max_unpaired::Real=Inf,
     max_freq::Real=Inf, max_sins::Real=Inf,
+    unpaired_mask=nothing,
+    customtruncfunc=nothing,
     kwargs...
-) where {TT<:Integer,CT}
-    unpaired_mask = create_unpaired_mask(nfermions(msum))
-    for (mstr, coeff) in msum
-        mp_checktruncationonone!(
-            msum, mstr, coeff, unpaired_mask;
-            max_weight=max_weight, min_abs_coeff=min_abs_coeff,
-            max_unpaired=max_unpaired,
-            max_freq=max_freq, max_sins=max_sins,
-            kwargs...
-        )
+)
+    if isnothing(unpaired_mask)
+        unpaired_mask = create_unpaired_mask(nfermions(mainsum(prop_cache)))
     end
+    function truncfunc(mstr, coeff)
+        # slight customization of the truncation function 
+        # to truncate majorana weight and single
+        is_truncated = false
+        if PauliPropagation.truncatemincoeff(coeff, min_abs_coeff)
+            is_truncated = true
+        elseif truncateunpaired(mstr, max_unpaired, unpaired_mask)
+            is_truncated = true
+        elseif truncatemajoranaweight(mstr, max_weight)
+            is_truncated = true
+        elseif PauliPropagation.truncatefrequency(coeff, max_freq)
+            is_truncated = true
+        elseif PauliPropagation.truncatesins(coeff, max_sins)
+            is_truncated = true
+        elseif !isnothing(customtruncfunc) && customtruncfunc(mstr, coeff)
+            is_truncated = true
+        end
+
+        return is_truncated
+    end
+    truncate!(truncfunc, prop_cache; kwargs...)
+
     return
 end
 
-
-function mp_checktruncationonone!(
-    msum::MajoranaSum{TT,CT}, mstr::TT, coeff::CT, unpaired_mask::TT;
-    max_weight::Real=Inf, min_abs_coeff=1e-10,
-    max_unpaired::Real=Inf,
+function PropagationBase.truncate!(
+    msum::AbstractMajoranaSum;
+    max_weight::Real=Inf, min_abs_coeff=1e-10, max_unpaired::Real=Inf,
     max_freq::Real=Inf, max_sins::Real=Inf,
+    unpaired_mask=nothing,
     customtruncfunc=nothing,
     kwargs...
-) where {TT<:Integer,CT}
-    # slight customization of the truncation function
-    # to truncate majorana weight and single
-    is_truncated = false
-    if truncatemajoranaweight(mstr, max_weight)
-        is_truncated = true
-    elseif truncateunpaired(mstr, max_unpaired, unpaired_mask)
-        is_truncated = true
-    elseif truncatemincoeff(coeff, min_abs_coeff)
-        is_truncated = true
-    elseif truncatefrequency(coeff, max_freq)
-        is_truncated = true
-    elseif truncatesins(coeff, max_sins)
-        is_truncated = true
-    elseif !isnothing(customtruncfunc) && customtruncfunc(mstr, coeff)
-        is_truncated = true
+)
+    if isnothing(unpaired_mask)
+        unpaired_mask = create_unpaired_mask(nfermions(msum))
     end
-    if is_truncated
-        delete!(msum, mstr)
+    function truncfunc(mstr, coeff)
+        # slight customization of the truncation function 
+        # to truncate majorana weight and single
+        is_truncated = false
+        if PauliPropagation.truncatemincoeff(coeff, min_abs_coeff)
+            is_truncated = true
+        elseif truncateunpaired(mstr, max_unpaired, unpaired_mask)
+            is_truncated = true
+        elseif truncatemajoranaweight(mstr, max_weight)
+            is_truncated = true
+        elseif PauliPropagation.truncatefrequency(coeff, max_freq)
+            is_truncated = true
+        elseif PauliPropagation.truncatesins(coeff, max_sins)
+            is_truncated = true
+        elseif !isnothing(customtruncfunc) && customtruncfunc(mstr, coeff)
+            is_truncated = true
+        end
+
+        return is_truncated
     end
-    return
+    msum = truncate!(truncfunc, msum; kwargs...)
+
+    return msum
 end

@@ -15,7 +15,7 @@ include("yao_helpers/fermionicgates_to_yao.jl")
 
             #initial state
             occupied_sites = 1:2:n_fermions
-            fock_state = fockstate(occupied_sites)
+            fock_state = FockState(n_fermions, occupied_sites)
 
             yao_psi = zero_state(n_fermions)
             state_prep = chain(n_fermions, put(site => Yao.X) for site in occupied_sites)
@@ -58,7 +58,7 @@ include("yao_helpers/fermionicgates_to_yao.jl")
 
             #initial state
             occupied_sites = 2:2:n_fermions
-            fock_state = fockstate(occupied_sites)
+            fock_state = FockState(n_fermions, occupied_sites)
 
             yao_psi = zero_state(n_fermions)
             state_prep = chain(n_fermions, put(site => Yao.X) for site in occupied_sites)
